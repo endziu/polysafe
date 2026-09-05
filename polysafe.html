@@ -45,6 +45,12 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
         input[type=submit]:disabled { opacity: .65; cursor: wait; }
         input[type=file] { padding: 8px; border: 1px solid #343a46; background: #11141a; font-size: 13px; }
         input[type=file]::file-selector-button { margin-right: 10px; padding: 8px 10px; border: 0; border-radius: 6px; background: #252a34; color: #f1f3f5; font: inherit; font-weight: 600; cursor: pointer; }
+        .password-strength, .password-match { padding-left: 15px; display: flex; align-items: center; gap: 8px; color: #9ca3af; font-size: 13px; }
+        .strength-light { width: 9px; height: 9px; flex-shrink: 0; border-radius: 50%; background: #343a46; }
+        .password-strength[data-level=low] .strength-light:nth-child(1) { background: #ff8a8a; }
+        .password-strength[data-level=medium] .strength-light:nth-child(2) { background: #ffb454; }
+        .password-strength[data-level=high] .strength-light:nth-child(3) { background: #76d99b; }
+        .password-match[data-match=true] .strength-light { background: #76d99b; }
         .status { margin: 16px 0 0; color: #ff8a8a; line-height: 1.5; }
         .status:empty { display: none; }
         noscript { display: block; color: #ff8a8a; line-height: 1.5; }
@@ -60,14 +66,74 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
         <noscript>JavaScript is required to encrypt files.</noscript>
         <form action="javascript:;" style="display:none">
             <input type="file" id="file" aria-label="File to encrypt" autofocus>
-            <input type="password" id="password" aria-label="Password" placeholder="Password" autocomplete="new-password" aria-describedby="password-guidance" required>
-            <input type="password" id="password_repeated" aria-label="Repeat password" placeholder="Repeat password" autocomplete="new-password" aria-describedby="password-guidance" required>
+            <input type="password" id="password" aria-label="Password" placeholder="Password" autocomplete="new-password" aria-describedby="password-guidance password-strength-label" required>
+            <div class="password-strength" id="password-strength" data-level="empty">
+                <span class="strength-light" aria-hidden="true"></span>
+                <span class="strength-light" aria-hidden="true"></span>
+                <span class="strength-light" aria-hidden="true"></span>
+                <span id="password-strength-label" role="status" aria-live="polite">password strength</span>
+            </div>
+            <input type="password" id="password_repeated" aria-label="Repeat password" placeholder="Repeat password" autocomplete="new-password" aria-describedby="password-guidance password-match-label" required>
+            <div class="password-match" id="password-match" data-match="false">
+                <span class="strength-light" aria-hidden="true"></span>
+                <span id="password-match-label" role="status" aria-live="polite">passwords match</span>
+            </div>
             <input type="submit" value="Encrypt file">
         </form>
         <p class="status" role="status" aria-live="polite"></p>
     </main>
     <script>
         'use strict';
+
+        // A lightweight complexity estimate, not a prediction of cracking time.
+        function passwordStrength(password) {
+            if (!password.length) return 'empty';
+            const normalized = password.normalize('NFKC').toLowerCase();
+            const characters = Array.from(normalized);
+            const unique = new Set(characters).size;
+            const common = normalized.replace(/[^a-z]+$/, '').replace(/[013457@$!]/g, character => ({
+                '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't',
+                '@': 'a', '$': 's', '!': 'i'
+            })[character]).replace(/[^a-z]/g, '');
+            const predictable = /^(password|letmein|welcome|admin|qwerty|iloveyou)+$/.test(common)
+                || /^(1234567890?|0123456789|qwertyuiop|asdfghjkl|abcdefghijklmnopqrstuvwxyz)+$/.test(normalized)
+                || /^(.{1,6})\1+$/u.test(normalized);
+            if (characters.length < 10 || unique < 5 || predictable) return 'low';
+            const variety = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^a-zA-Z0-9]/]
+                .filter(pattern => pattern.test(password)).length;
+            if (characters.length >= 16 && unique >= 8 && (variety >= 2 || characters.length >= 20)) {
+                return 'high';
+            }
+            return 'medium';
+        }
+
+        function updatePasswordStrength() {
+            const level = passwordStrength(document.getElementById('password').value);
+            document.getElementById('password-strength').dataset.level = level;
+            document.getElementById('password-strength-label').setAttribute('aria-label',
+                level === 'empty' ? 'Password strength: not entered' : 'Password strength: ' + level);
+        }
+
+        function updatePasswordMatch() {
+            const password = document.getElementById('password').value;
+            const repeated = document.getElementById('password_repeated').value;
+            const matches = password.length > 0 && password === repeated;
+            document.getElementById('password-match').dataset.match = String(matches);
+            document.getElementById('password-match-label').setAttribute('aria-label',
+                matches ? 'Passwords match' : 'Passwords do not match');
+        }
+
+        for (const id of ['password', 'password_repeated']) {
+            document.getElementById(id).addEventListener('input', updatePasswordMatch);
+            document.getElementById(id).addEventListener('change', updatePasswordMatch);
+        }
+        window.addEventListener('pageshow', updatePasswordMatch);
+        updatePasswordMatch();
+
+        document.getElementById('password').addEventListener('input', updatePasswordStrength);
+        document.getElementById('password').addEventListener('change', updatePasswordStrength);
+        window.addEventListener('pageshow', updatePasswordStrength);
+        updatePasswordStrength();
 
         function getRandomBytes(num) {
             let bytes = new Uint8Array(num);

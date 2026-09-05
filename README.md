@@ -43,7 +43,7 @@ PolySafe relies on the following algorithms offered natively by the WebCrypto AP
 * Authenticated encryption: AES-GCM (128 bits with a cryptographically random IV)
 * Key derivation: PBKDF2-HMAC-SHA256 (600,000 iterations with a cryptographically random salt)
 
-New encryption rejects empty passwords. Passwords are used exactly as entered, including spaces; no password-strength check is enforced.
+New encryption rejects empty passwords. Passwords are used exactly as entered, including spaces; a local strength estimate is shown as red (low), orange (medium), or green (high) lights as you type. The estimate considers length, character variety, repetition, and a small set of common patterns. It is advisory and does not block nonempty passwords or guarantee resistance to guessing. No passwords are sent anywhere, and the indicator requires no external libraries.
 
 The PBKDF2 settings use [OWASP password-storage guidance](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#pbkdf2) as a hardening benchmark, rather than a browser performance requirement. Existing generated HTML files retain their embedded PBKDF2-HMAC-SHA1 decryptor (200,000 iterations) and remain decryptable, including files originally created with an empty password. To upgrade an existing file, decrypt it and encrypt it again with this version and a long, unique passphrase.
 

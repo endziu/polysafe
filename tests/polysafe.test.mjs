@@ -14,7 +14,10 @@ function page(html, secret = password, repeated = secret) {
     const button = { disabled: false };
     const form = { style: {}, addEventListener() {} };
     const fields = {
-        password: { value: secret }, password_repeated: { value: repeated },
+        password: { value: secret, addEventListener() {} },
+        'password-strength': { dataset: {} }, 'password-strength-label': { textContent: 'password strength', setAttribute(name, value) { this[name] = value; } }, password_repeated: { value: repeated, addEventListener() {} },
+        'password-match': { dataset: {} },
+        'password-match-label': { setAttribute(name, value) { this[name] = value; } },
         file: { files: [{ name: filename }] },
         data: { textContent: html.match(/<script id="data"[^>]*>([\s\S]*?)<\/script>/)?.[1] }
     };
@@ -24,7 +27,7 @@ function page(html, secret = password, repeated = secret) {
     const context = vm.createContext({
         TextEncoder, TextDecoder, Uint8Array, Blob, DOMException, atob,
         setTimeout: callback => setTimeout(callback, 0),
-        window: { crypto: {
+        window: { addEventListener() {}, crypto: {
             getRandomValues: array => webcrypto.getRandomValues(array),
             subtle: new Proxy(webcrypto.subtle, {
                 get(target, key) {
@@ -138,3 +141,25 @@ for (const [name, secret] of [['legacy-password', password], ['legacy-empty', ''
     });
 }
 
+test('strength estimates handle empty, weak, moderate, and long passwords', () => {
+    const { context } = page(source);
+    for (const value of ['', 'short', 'Password123!', 'aaaaaaaaaaaaaaaaaaaa', 'abcabcabcabcabcabc', '12345678901234567890']) {
+        assert.equal(context.passwordStrength(value), value ? 'low' : 'empty', value);
+    }
+    assert.equal(context.passwordStrength('MapleRiver7'), 'medium');
+    assert.equal(context.passwordStrength('cedar orbit velvet harbor'), 'high');
+    assert.equal(context.passwordStrength('N8!rV2#pL9@xQ4$z'), 'high');
+});
+
+test('indicator updates and resets without changing password input', () => {
+    const { context } = page(source);
+    const input = context.document.getElementById('password');
+    for (const [value, level] of [['short', 'low'], ['MapleRiver7', 'medium'], ['cedar orbit velvet harbor', 'high'], ['', 'empty']]) {
+        input.value = value;
+        context.updatePasswordStrength();
+        assert.equal(context.document.getElementById('password-strength').dataset.level, level);
+        assert.equal(input.value, value);
+        assert.equal(context.document.getElementById('password-strength-label').textContent, 'password strength');
+        assert.match(context.document.getElementById('password-strength-label')['aria-label'], new RegExp(level === 'empty' ? 'not entered' : level));
+    }
+});
