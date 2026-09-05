@@ -116,9 +116,9 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
                 return window.crypto.subtle.deriveKey({
                         name: 'PBKDF2',
                         salt,
-                        iterations: 200000,
+                        iterations: 600000,
                         hash: {
-                            name: 'SHA-1'
+                            name: 'SHA-256'
                         }
                     },
                     key, {
@@ -326,9 +326,9 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
                 return window.crypto.subtle.deriveKey({
                         name: 'PBKDF2',
                         salt: salt,
-                        iterations: 200000,
+                        iterations: 600000,
                         hash: {
-                            name: 'SHA-1'
+                            name: 'SHA-256'
                         }
                     },
                     key, {

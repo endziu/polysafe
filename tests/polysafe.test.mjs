@@ -71,8 +71,8 @@ async function artifact() {
     await encryptor.run('runEncrypt');
     assert.equal(encryptor.status.textContent, '');
     assert.equal(encryptor.downloads.length, 1);
-    assert.equal(encryptor.derivations[0].iterations, 200000);
-    assert.equal(encryptor.derivations[0].hash.name, 'SHA-1');
+    assert.equal(encryptor.derivations[0].iterations, 600000);
+    assert.equal(encryptor.derivations[0].hash.name, 'SHA-256');
     return new TextDecoder().decode(encryptor.downloads[0][1]);
 }
 
@@ -106,15 +106,15 @@ test('mismatched passwords are rejected before reading', async () => {
     assert.equal(encryptor.downloads.length, 0);
 });
 
-test('artifacts preserve filename and binary bytes', async () => {
+test('new artifacts use stronger PBKDF2 and preserve filename and binary bytes', async () => {
     const html = await artifact();
     assert.ok(!html.includes(filename));
     assert.ok(!html.includes(password));
     const decryptor = page(html);
     await decryptor.run('runDecrypt');
     assertRecovered(decryptor);
-    assert.equal(decryptor.derivations[0].iterations, 200000);
-    assert.equal(decryptor.derivations[0].hash.name, 'SHA-1');
+    assert.equal(decryptor.derivations[0].iterations, 600000);
+    assert.equal(decryptor.derivations[0].hash.name, 'SHA-256');
 });
 
 test('wrong passwords and modified ciphertext are rejected', async () => {

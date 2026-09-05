@@ -41,9 +41,11 @@ Embed any file into an encrypted, self-decrypting HTML file.
 PolySafe relies on the following algorithms offered natively by the WebCrypto API and running directly in the browser:
 
 * Authenticated encryption: AES-GCM (128 bits with a cryptographically random IV)
-* Key derivation: PBKDF2 (200,000 rounds with a cryptographically random salt)
+* Key derivation: PBKDF2-HMAC-SHA256 (600,000 iterations with a cryptographically random salt)
 
 New encryption rejects empty passwords. Passwords are used exactly as entered, including spaces; no password-strength check is enforced.
+
+The PBKDF2 settings use [OWASP password-storage guidance](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#pbkdf2) as a hardening benchmark, rather than a browser performance requirement. Existing generated HTML files retain their embedded PBKDF2-HMAC-SHA1 decryptor (200,000 iterations) and remain decryptable, including files originally created with an empty password. To upgrade an existing file, decrypt it and encrypt it again with this version and a long, unique passphrase.
 
 Combined with a high-entropy password, this algorithmic setup should be reasonably secure for most users and their data. However, not just because of the possibility of bugs and structural weaknesses in the implementation, **there can be no guarantee whatsoever for the confidentiality of the processed data**.
 
@@ -54,6 +56,8 @@ Should the self-decrypting HTML file have passed outside of your control between
 ## Validation
 
 Run `node --test tests/polysafe.test.mjs` (Node.js 22 or newer). The tests execute the generator and generated decryptor with real WebCrypto and browser API stubs, checking password validation, binary roundtrips, wrong passwords, ciphertext tampering, and legacy compatibility.
+
+On 2026-09-05, headless Chromium 151 on Linux passed a browser form-validation check and an encryption/decryption roundtrip. The generator's PBKDF2 derivation took 56.7–58.0 ms across five runs after one warmup (median 57.0 ms). This is a local measurement, not a performance guarantee; Firefox, Safari, older browsers, and mobile devices were not benchmarked.
 
 Legacy fixtures were generated from reviewed commit `1dbf794c2b91f7c5254c33a3a3266ddb2e65fdbe`. They contain only test bytes; their passwords are recorded in the test file.
 
