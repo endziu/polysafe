@@ -273,6 +273,37 @@ test('input, change, pageshow and form reset update meaningful live text', async
     assert.equal(fields['password-match-label'].textContent, 'passwords match');
 });
 
+test('WebCrypto context failures return before reading or derivation in both paths', async () => {
+    const html = await artifact();
+    for (const [document, operation] of [[source, 'runEncrypt'], [html, 'runDecrypt']]) {
+        for (const window of [
+            { isSecureContext: false }, { isSecureContext: false, crypto: undefined },
+            { isSecureContext: true, crypto: undefined }, { isSecureContext: true, crypto: {} }
+        ]) {
+            const instance = page(document, password, password, { window });
+            await instance.run(operation);
+            assert.match(instance.status.textContent, window.isSecureContext === false ? /insecure context.*HTTPS/i : /does not support the Web Crypto API/);
+            assert.equal(instance.reads, 0);
+            assert.equal(instance.derivations.length, 0);
+            assert.equal(instance.downloads.length, 0);
+        }
+    }
+});
+
+test('working WebCrypto accepts secure and unspecified contexts and webkitSubtle decryptors', async () => {
+    for (const window of [{}, { isSecureContext: true }]) {
+        const encryptor = page(source, password, password, { window });
+        await encryptor.run('runEncrypt');
+        const html = new TextDecoder().decode(encryptor.downloads[0][1]);
+        const decryptor = page(html, password, password, { window });
+        await decryptor.run('runDecrypt');
+        assertRecovered(decryptor);
+        const fallback = page(html, password, password, { window: { ...window, crypto: { webkitSubtle: webcrypto.subtle } } });
+        await fallback.run('runDecrypt');
+        assertRecovered(fallback);
+    }
+});
+
 test('nonempty whitespace passwords roundtrip exactly as entered', async () => {
     const secret = '   ';
     const encryptor = page(source, secret);

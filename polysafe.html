@@ -365,6 +365,10 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
             const status = document.querySelector('.status');
             status.textContent = '';
 
+            if (window.isSecureContext === false) {
+                status.textContent = 'This insecure context prevents Web Crypto use. Open this page over HTTPS or as a local file in a supported browser.';
+                return;
+            }
             if (!window.crypto || !window.crypto.subtle) {
                 status.textContent = 'Your browser does not support the Web Crypto API.';
                 return;
@@ -520,6 +524,10 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
             var status = document.querySelector('.status');
             status.textContent = '';
 
+            if (window.isSecureContext === false) {
+                status.textContent = 'This insecure context prevents Web Crypto use. Open this page over HTTPS or as a local file in a supported browser.';
+                return;
+            }
             if (!window.crypto || !window.crypto.subtle) {
                 status.textContent = 'Your browser does not support the Web Crypto API.';
                 return;
