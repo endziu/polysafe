@@ -14,72 +14,57 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
     <title>PolySafe</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        form {
+        * { box-sizing: border-box; }
+        html { min-height: 100%; background: #0f1115; color-scheme: dark; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            min-height: 100svh;
             display: grid;
-            grid-template-columns: max-content max-content;
-            grid-gap: 10px;
-            align-items: center;
+            place-items: center;
+            padding: 24px;
+            color: #f1f3f5;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
-
-        .grid-1-l {
-            grid-row: 1;
-            grid-column: 1;
+        main {
+            width: 100%;
+            max-width: 400px;
+            padding: 32px;
+            border: 1px solid #2a2f3a;
+            border-radius: 12px;
+            background: #171a21;
         }
-
-        .grid-1-r {
-            grid-row: 1;
-            grid-column: 2;
-        }
-        .grid-2-l {
-            grid-row: 2;
-            grid-column: 1;
-        }
-        .grid-2-r {
-            grid-row: 2;
-            grid-column: 2;
-        }
-        .grid-3-l {
-            grid-row: 3;
-            grid-column: 1;
-        }
-        .grid-3-r {
-            grid-row: 3;
-            grid-column: 2;
-        }
-        .grid-4-r {
-            grid-row: 4;
-            grid-column: 2;
-        }
+        h1 { margin: 0; font-size: 24px; letter-spacing: -0.02em; }
+        .intro { margin: 8px 0 24px; color: #9ca3af; line-height: 1.5; }
+        form { display: grid; gap: 12px; }
+        input { display: block; width: 100%; min-height: 48px; border-radius: 8px; font: inherit; }
+        input[type=password] { padding: 12px 14px; border: 1px solid #343a46; color: #f1f3f5; background: #11141a; }
+        input:focus-visible { outline: 2px solid #8b7cf6; outline-offset: 2px; }
+        input[type=submit] { border: 0; padding: 12px; background: #7c6df2; color: white; font-weight: 600; cursor: pointer; }
+        input[type=submit]:hover { background: #6d5ee8; }
+        input[type=submit]:disabled { opacity: .65; cursor: wait; }
+        input[type=file] { padding: 8px; border: 1px solid #343a46; background: #11141a; font-size: 13px; }
+        input[type=file]::file-selector-button { margin-right: 10px; padding: 8px 10px; border: 0; border-radius: 6px; background: #252a34; color: #f1f3f5; font: inherit; font-weight: 600; cursor: pointer; }
+        .status { margin: 16px 0 0; color: #ff8a8a; line-height: 1.5; }
+        .status:empty { display: none; }
+        noscript { display: block; color: #ff8a8a; line-height: 1.5; }
+        @media (max-width: 380px) { main { padding: 24px 20px; } }
     </style>
 </head>
 
 <body>
-    <noscript>
-        PolySafe will not work without JavaScript enabled!<br/>
-    </noscript>
-    <form action="javascript:;" style="display:none">
-        <div class="grid-1-l">
-            <label for="file">File to encrypt:</label>
-        </div>
-        <div class="grid-1-r">
-            <input type="file" id="file" autofocus>
-        </div>
-        <div class="grid-2-l">
-            <label for="password">Password:</label>
-        </div>
-        <div class="grid-2-r">
-            <input type="password" id="password">
-        </div>
-        <div class="grid-3-l">
-            <label for="password_repeated">Repeat password:</label>
-        </div>
-        <div class="grid-3-r">
-            <input type="password" id="password_repeated">
-        </div>
-        <div class="grid-4-r">
+    <main>
+        <h1>PolySafe</h1>
+        <p class="intro">Encrypt a file into a self-decrypting HTML file.</p>
+        <noscript>JavaScript is required to encrypt files.</noscript>
+        <form action="javascript:;" style="display:none">
+            <input type="file" id="file" aria-label="File to encrypt" autofocus>
+            <input type="password" id="password" aria-label="Password" placeholder="Password" autocomplete="new-password">
+            <input type="password" id="password_repeated" aria-label="Repeat password" placeholder="Repeat password" autocomplete="new-password">
             <input type="submit" value="Encrypt file">
-        </div>
-    </form>
+        </form>
+        <p class="status" role="status" aria-live="polite"></p>
+    </main>
     <script>
         'use strict';
 
@@ -238,27 +223,28 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
         }
 
         function runEncrypt() {
-            if (!window.crypto) {
-                alert(
-                    'Full support for the WebCrypto API is needed for decryption. Please use one of the following browsers: Chrome 37+, Firefox 34+, Safari 7+, Opera 24+'
-                )
+            const status = document.querySelector('.status');
+            status.textContent = '';
+
+            if (!window.crypto || !window.crypto.subtle) {
+                status.textContent = 'Your browser does not support the Web Crypto API.';
                 return;
             }
 
             const file = document.getElementById('file').files[0];
             if (!file) {
-                alert('Select a file first.');
+                status.textContent = 'Select a file first.';
                 return;
             }
             const password = document.getElementById('password').value;
             if (password != document.getElementById('password_repeated').value) {
-                alert('Passwords must match.');
+                status.textContent = 'Passwords must match.';
                 return;
             }
 
             const encryptButton = document.querySelector('input[type=submit]');
             encryptButton.disabled = true;
-            encryptButton.value = 'Encrypting...';
+            encryptButton.value = 'Encrypting…';
 
             const salt = getRandomBytes(16);
             const iv = getRandomBytes(16);
@@ -269,7 +255,9 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
                     .then(key => encrypt(key, iv, payload_bytes)))
                 .then(buffer => serialize(salt, iv, buffer))
                 .then(buffer => download(file.name + '.html', buffer))
-                .catch(e => alert('Error during encryption: ' + e.message))
+                .catch(e => {
+                    status.textContent = 'Encryption failed: ' + e.message;
+                })
                 .finally(() => {
                     encryptButton.disabled = false;
                     encryptButton.value = 'Encrypt file';
@@ -280,7 +268,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
             e.preventDefault();
             runEncrypt();
         });
-        document.querySelector('form').style.display = 'block';
+        document.querySelector('form').style.display = 'grid';
 
         const DECRYPTOR_TEMPLATE =
             `
@@ -291,17 +279,20 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
     <meta charset="utf-8" />
     <title>PolySafe</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>${document.querySelector('style').textContent}</style>
 </head>
 
 <body>
-    <noscript>
-        Decryption will not work without JavaScript enabled!<br/>
-    </noscript>
-    <form action="javascript:;" style="display:none">
-        <label for="password">Password:</label>
-        <input type="password" autofocus>
-        <input type="submit" value="Decrypt file">
-    </form>
+    <main>
+        <h1>PolySafe</h1>
+        <p class="intro">Enter the password to decrypt this file.</p>
+        <noscript>JavaScript is required to decrypt files.</noscript>
+        <form action="javascript:;" style="display:none">
+            <input id="password" type="password" aria-label="Password" placeholder="Password" autocomplete="current-password" autofocus>
+            <input type="submit" value="Decrypt file">
+        </form>
+        <p class="status" role="status" aria-live="polite"></p>
+    </main>
     <script id="data" type="application/json">
         {{___PAYLOAD___}}
     <\/script>
@@ -383,15 +374,17 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
         }
 
         function runDecrypt() {
-            if (!window.crypto) {
-                alert(
-                    'Full support for the WebCrypto API is needed for decryption. Please use one of the following browsers: Chrome 37+, Firefox 34+, Safari 7+, Opera 24+'
-                )
+            var status = document.querySelector('.status');
+            status.textContent = '';
+
+            if (!window.crypto || !window.crypto.subtle) {
+                status.textContent = 'Your browser does not support the Web Crypto API.';
+                return;
             }
 
             var decryptButton = document.querySelector('input[type=submit]');
             decryptButton.disabled = true;
-            decryptButton.value = 'Decrypting...';
+            decryptButton.value = 'Decrypting…';
 
             setTimeout(function () {
                 var data = JSON.parse(document.getElementById('data').textContent);
@@ -410,7 +403,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
                     .then(extractDecryptedFile)
                     .then(download)
                     .catch(function (e) {
-                        alert('Error during decryption: ' + e);
+                        status.textContent = 'Decryption failed: ' + e;
                     })
                     .then(function () {
                         decryptButton.disabled = false;
@@ -423,7 +416,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
             e.preventDefault();
             runDecrypt();
         });
-        document.querySelector('form').style.display = 'block';
+        document.querySelector('form').style.display = 'grid';
     <\/script>
 </body>
 
