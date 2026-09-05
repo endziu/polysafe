@@ -173,7 +173,7 @@ test('indicator updates and resets without changing password input', () => {
         assert.equal(context.document.getElementById('password-strength').dataset.level, level);
         assert.equal(input.value, value);
         assert.equal(context.document.getElementById('password-strength-label').textContent, 'password strength');
-        assert.match(context.document.getElementById('password-strength-label')['aria-label'], new RegExp(level === 'empty' ? 'not entered' : level));
+        assert.equal(context.document.getElementById('password-strength-status').textContent, 'Password strength: ' + (level === 'empty' ? 'not entered' : level));
     }
 });
 
@@ -222,6 +222,55 @@ test('strength boundaries retain long varied passphrases and random lowercase pa
         ['cedar orbit velvet harbor', 'high'], ['glacier marmot lantern orchard', 'high'],
         ['                    ', 'low']
     ]) assert.equal(context.passwordStrength(value), level, value);
+});
+
+test('live status markup describes inputs and keeps visible labels out of announcements', () => {
+    for (const [input, name, label] of [
+        ['password', 'strength', 'password strength'], ['password_repeated', 'match', 'passwords match']
+    ]) {
+        assert.match(source.match(new RegExp(`<input[^>]*id="${input}"[^>]*>`))[0], new RegExp(`aria-describedby="password-${name}-status"`));
+        const status = source.match(new RegExp(`<span[^>]*id="password-${name}-status"[^>]*>`))[0];
+        assert.match(status, /role="status"/);
+        assert.match(status, /aria-atomic="true"/);
+        assert.match(status, /class="visually-hidden"/);
+        assert.match(source, new RegExp(`<span id="password-${name}-label" aria-hidden="true">${label}</span>`));
+    }
+});
+
+test('input, change, pageshow and form reset update meaningful live text', async () => {
+    const { context, fields, form } = page(source, '', '');
+    assert.equal(fields['password-strength-status'].textContent, 'Password strength: not entered');
+    assert.equal(fields['password-match-status'].textContent, 'Passwords not entered');
+    for (const event of ['input', 'change', 'pageshow']) {
+        fields.password.value = 'cedar orbit velvet harbor';
+        fields.password_repeated.value = '';
+        if (event === 'pageshow') context.window.dispatch(event);
+        else fields.password.dispatch(event);
+        assert.equal(fields['password-strength-status'].textContent, 'Password strength: high');
+        assert.equal(fields['password-match-status'].textContent, 'Repeat password to check for a match');
+        fields.password_repeated.value = 'different';
+        if (event === 'pageshow') context.window.dispatch(event);
+        else fields.password_repeated.dispatch(event);
+        assert.equal(fields['password-match-status'].textContent, 'Passwords do not match');
+        fields.password_repeated.value = fields.password.value;
+        if (event === 'pageshow') context.window.dispatch(event);
+        else fields.password_repeated.dispatch(event);
+        assert.equal(fields['password-match-status'].textContent, 'Passwords match');
+        assert.equal(fields['password-match'].dataset.match, 'true');
+        assert.equal(fields.password.value, 'cedar orbit velvet harbor');
+        assert.equal(fields.password_repeated.value, fields.password.value);
+    }
+    fields.password.value = '';
+    fields.password.dispatch('input');
+    assert.equal(fields['password-match-status'].textContent, 'Enter a password to check for a match');
+    form.dispatch('reset');
+    fields.password_repeated.value = '';
+    await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(fields['password-strength-status'].textContent, 'Password strength: not entered');
+    assert.equal(fields['password-match-status'].textContent, 'Passwords not entered');
+    assert.equal(fields['password-match'].dataset.match, 'false');
+    assert.equal(fields['password-strength-label'].textContent, 'password strength');
+    assert.equal(fields['password-match-label'].textContent, 'passwords match');
 });
 
 test('nonempty whitespace passwords roundtrip exactly as entered', async () => {
