@@ -313,3 +313,35 @@ test('nonempty whitespace passwords roundtrip exactly as entered', async () => {
     await decryptor.run('runDecrypt');
     assertRecovered(decryptor);
 });
+
+test('a 1 MiB binary file roundtrips with a Unicode filename', async () => {
+    const content = Uint8Array.from({ length: 1024 * 1024 }, (_, i) => i % 256);
+    const name = 'zażółć-東京-🔐.bin';
+    const encryptor = page(source, password, password, { bytes: content, filename: name });
+    await encryptor.run('runEncrypt');
+    const decryptor = page(new TextDecoder().decode(encryptor.downloads[0][1]));
+    await decryptor.run('runDecrypt');
+    assert.equal(decryptor.status.textContent, '');
+    assert.equal(decryptor.downloads.length, 1);
+    const file = decryptor.downloads[0][0];
+    assert.equal(file.name, name);
+    assert.deepEqual(file.content, content);
+    assert.deepEqual(new Uint8Array(await new Blob([file.content]).arrayBuffer()), content);
+});
+
+test('empty file content and malformed decrypted headers are handled', async () => {
+    const html = await artifact();
+    const decryptor = page(html);
+    const emptyFile = decryptor.context.extractDecryptedFile(new TextEncoder().encode('empty-🔐.bin/').buffer);
+    assert.equal(emptyFile.name, 'empty-🔐.bin');
+    assert.equal(emptyFile.content.length, 0);
+    // Exercise extraction failure after real, successful authenticated decryption.
+    const encryptor = page(source);
+    encryptor.context.preprendFilename = () => new TextEncoder().encode('missing separator');
+    await encryptor.run('runEncrypt');
+    const invalid = page(new TextDecoder().decode(encryptor.downloads[0][1]));
+    await invalid.run('runDecrypt');
+    assert.match(invalid.status.textContent, /Decryption failed: Decrypted data is corrupted/);
+    assert.equal(invalid.button.value, 'Decrypt file');
+    assert.equal(invalid.downloads.length, 0);
+});

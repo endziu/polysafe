@@ -449,9 +449,12 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
         }
 
         function base64ToArray(base64) {
-            return new Uint8Array(atob(base64).split('').map(function (c) {
-                return c.charCodeAt(0);
-            }));
+            var binary = atob(base64);
+            var bytes = new Uint8Array(binary.length);
+            for (var i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes;
         }
 
         function deriveKey(password, salt) {
@@ -497,8 +500,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
             if (slash_pos == -1) {
                 throw 'Decrypted data is corrupted';
             } else {
-                var name = new TextDecoder('utf-8').decode(new Uint8Array(Array.prototype.slice.call(bytes, 0, slash_pos)));
-                var content = new Uint8Array(Array.prototype.slice.call(bytes, slash_pos + 1));
+                var name = new TextDecoder('utf-8').decode(bytes.subarray(0, slash_pos));
+                var content = bytes.subarray(slash_pos + 1);
                 return {
                     name: name,
                     content: content
