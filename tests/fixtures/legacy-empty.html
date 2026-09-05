@@ -1,0 +1,150 @@
+
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>PolySafe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style></style>
+</head>
+
+<body>
+    <main>
+        <h1>PolySafe</h1>
+        <p class="intro">Enter the password to decrypt this file.</p>
+        <noscript>JavaScript is required to decrypt files.</noscript>
+        <form action="javascript:;" style="display:none">
+            <input id="password" type="password" aria-label="Password" placeholder="Password" autocomplete="current-password" autofocus>
+            <input type="submit" value="Decrypt file">
+        </form>
+        <p class="status" role="status" aria-live="polite"></p>
+    </main>
+    <script id="data" type="application/json">
+        {"salt":[76,179,21,107,217,166,141,158,19,52,188,11,1,211,251,246],"iv":[109,130,201,102,197,64,238,248,38,3,137,252,20,20,122,174],"encrypted":"e2knd0DpvoUXNbvGxu0VxyFHEhN0v9pOxlV342P6okMKdQh4rj+pZGyJuyc="}
+    </script>
+    <script>
+        if (window.crypto && !window.crypto.subtle && window.crypto.webkitSubtle) {
+            window.crypto.subtle = window.crypto.webkitSubtle;
+        }
+
+        function base64ToArray(base64) {
+            return new Uint8Array(atob(base64).split('').map(function (c) {
+                return c.charCodeAt(0);
+            }));
+        }
+
+        function deriveKey(password, salt) {
+            var passwordBytes = new TextEncoder('utf-8').encode(password);
+
+            return window.crypto.subtle.importKey(
+                'raw',
+                passwordBytes, {
+                    name: 'PBKDF2'
+                },
+                false,
+                ['deriveKey']
+            ).then(function (key) {
+                return window.crypto.subtle.deriveKey({
+                        name: 'PBKDF2',
+                        salt: salt,
+                        iterations: 200000,
+                        hash: {
+                            name: 'SHA-1'
+                        }
+                    },
+                    key, {
+                        name: 'AES-GCM',
+                        length: 128
+                    },
+                    false,
+                    ['decrypt']
+                )
+            });
+        }
+
+        function decrypt(key, iv, bytes) {
+            return window.crypto.subtle.decrypt({
+                name: 'AES-GCM',
+                length: 128,
+                iv: iv
+            }, key, bytes);
+        }
+
+        function extractDecryptedFile(buffer) {
+            var bytes = new Uint8Array(buffer);
+            var slash_pos = Array.prototype.indexOf.call(bytes, '/'.charCodeAt(0));
+            if (slash_pos == -1) {
+                throw 'Decrypted data is corrupted';
+            } else {
+                var name = new TextDecoder('utf-8').decode(new Uint8Array(Array.prototype.slice.call(bytes, 0, slash_pos)));
+                var content = new Uint8Array(Array.prototype.slice.call(bytes, slash_pos + 1));
+                return {
+                    name: name,
+                    content: content
+                };
+            }
+        }
+
+        function download(file) {
+            var a = document.createElement('a');
+            a.style = 'display: none';
+            document.body.appendChild(a);
+            var blob = new Blob([file.content]);
+            var url = window.URL.createObjectURL(blob);
+            a.href = url;
+            a.download = file.name;
+            a.click();
+            setTimeout(function () {
+                window.URL.revokeObjectURL(url);
+            }, 10000);
+        }
+
+        function runDecrypt() {
+            var status = document.querySelector('.status');
+            status.textContent = '';
+
+            if (!window.crypto || !window.crypto.subtle) {
+                status.textContent = 'Your browser does not support the Web Crypto API.';
+                return;
+            }
+
+            var decryptButton = document.querySelector('input[type=submit]');
+            decryptButton.disabled = true;
+            decryptButton.value = 'Decrypting…';
+
+            setTimeout(function () {
+                var data = JSON.parse(document.getElementById('data').textContent);
+                var salt = new Uint8Array(data.salt);
+                var iv = new Uint8Array(data.iv);
+                var encrypted = base64ToArray(data.encrypted);
+
+                var password = document.querySelector('input[type=password]').value;
+                deriveKey(password, salt)
+                    .then(function (key) {
+                        return decrypt(key, iv, encrypted);
+                    })
+                    .catch(function () {
+                        throw 'Wrong password or corrupted file.';
+                    })
+                    .then(extractDecryptedFile)
+                    .then(download)
+                    .catch(function (e) {
+                        status.textContent = 'Decryption failed: ' + e;
+                    })
+                    .then(function () {
+                        decryptButton.disabled = false;
+                        decryptButton.value = 'Decrypt file';
+                    });
+            }, 0);
+        }
+
+        document.querySelector('form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            runDecrypt();
+        });
+        document.querySelector('form').style.display = 'grid';
+    </script>
+</body>
+
+</html>

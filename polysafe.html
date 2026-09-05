@@ -56,11 +56,12 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
     <main>
         <h1>PolySafe</h1>
         <p class="intro">Encrypt a file into a self-decrypting HTML file.</p>
+        <p class="intro" id="password-guidance">Use a long, unique passphrase.</p>
         <noscript>JavaScript is required to encrypt files.</noscript>
         <form action="javascript:;" style="display:none">
             <input type="file" id="file" aria-label="File to encrypt" autofocus>
-            <input type="password" id="password" aria-label="Password" placeholder="Password" autocomplete="new-password">
-            <input type="password" id="password_repeated" aria-label="Repeat password" placeholder="Repeat password" autocomplete="new-password">
+            <input type="password" id="password" aria-label="Password" placeholder="Password" autocomplete="new-password" aria-describedby="password-guidance" required>
+            <input type="password" id="password_repeated" aria-label="Repeat password" placeholder="Repeat password" autocomplete="new-password" aria-describedby="password-guidance" required>
             <input type="submit" value="Encrypt file">
         </form>
         <p class="status" role="status" aria-live="polite"></p>
@@ -237,6 +238,10 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
                 return;
             }
             const password = document.getElementById('password').value;
+            if (password.length === 0) {
+                status.textContent = 'Enter a long, unique passphrase before encrypting.';
+                return;
+            }
             if (password != document.getElementById('password_repeated').value) {
                 status.textContent = 'Passwords must match.';
                 return;
