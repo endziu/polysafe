@@ -57,6 +57,10 @@ Should the self-decrypting HTML file have passed outside of your control between
 
 Run `node --test tests/polysafe.test.mjs` (Node.js 22 or newer). The tests execute the generator and generated decryptor with real WebCrypto and browser API stubs, checking password validation, binary roundtrips, wrong passwords, ciphertext tampering, and legacy compatibility.
 
+Run `make build` before publishing. It synchronizes the application and CNAME into `dist/`, including `index.html` for the site root.
+
+Run `make test` to execute the regression tests. Run `make clear` to remove the generated `dist/` files.
+
 On 2026-09-05, headless Chromium 151 on Linux passed a browser form-validation check and an encryption/decryption roundtrip. The generator's PBKDF2 derivation took 56.7–58.0 ms across five runs after one warmup (median 57.0 ms). This is a local measurement, not a performance guarantee; Firefox, Safari, older browsers, and mobile devices were not benchmarked.
 
 Legacy fixtures were generated from reviewed commit `1dbf794c2b91f7c5254c33a3a3266ddb2e65fdbe`. They contain only test bytes; their passwords are recorded in the test file.
