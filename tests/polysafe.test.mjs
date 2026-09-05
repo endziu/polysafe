@@ -199,3 +199,37 @@ for (const [label, payload] of [
         assertRecovered(decryptor);
     });
 }
+
+test('strength estimates reject sequences, truncated repetitions and combined common patterns', () => {
+    const { context } = page(source);
+    for (const value of [
+        'abcdefghijklmnopqrst', '1234567890abcdefghij', 'Password1Password1Pa',
+        'myname19851985myname', 'abcdefghij', 'zyxwvutsrqponmlkjihgf',
+        '9876543210jihgfedcba', 'qwertyuiopasdfghjkl', 'poiuytrewqlkjhgfdsa',
+        'sunflowerSUNFLOWERsun', 'welcome123admin456', 'P@ssword1P@ssword1Pa',
+        'abcd-efgh-ijkl-mnop', 'ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴ'
+    ]) assert.equal(context.passwordStrength(value), 'low', value);
+});
+
+test('strength boundaries retain long varied passphrases and random lowercase passwords', () => {
+    const { context } = page(source);
+    const lowercase = 'vnrqkzpmxbjtwfhsuacdg';
+    for (const [value, level] of [
+        [lowercase.slice(0, 9), 'low'], [lowercase.slice(0, 10), 'medium'],
+        [lowercase.slice(0, 19), 'medium'], [lowercase.slice(0, 20), 'high'],
+        ['vxqjznrktpmwcsfhbdgu', 'high'],
+        ['N8!rV2#pL9@xQ4$', 'medium'], ['N8!rV2#pL9@xQ4$z', 'high'],
+        ['cedar orbit velvet harbor', 'high'], ['glacier marmot lantern orchard', 'high'],
+        ['                    ', 'low']
+    ]) assert.equal(context.passwordStrength(value), level, value);
+});
+
+test('nonempty whitespace passwords roundtrip exactly as entered', async () => {
+    const secret = '   ';
+    const encryptor = page(source, secret);
+    await encryptor.run('runEncrypt');
+    const html = new TextDecoder().decode(encryptor.downloads[0][1]);
+    const decryptor = page(html, secret);
+    await decryptor.run('runDecrypt');
+    assertRecovered(decryptor);
+});

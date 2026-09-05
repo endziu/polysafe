@@ -130,15 +130,33 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
         function passwordStrength(password) {
             if (!password.length) return 'empty';
             const normalized = password.normalize('NFKC').toLowerCase();
-            const characters = Array.from(normalized);
-            const unique = new Set(characters).size;
-            const common = normalized.replace(/[^a-z]+$/, '').replace(/[013457@$!]/g, character => ({
+            // Detect passwords dominated by easy-to-guess runs. This
+            // also catches concatenated patterns and incomplete final repetitions.
+            const patternText = normalized.replace(/[\s!.,_-]+/g, '');
+            let remaining = patternText;
+            const sequences = ['abcdefghijklmnopqrstuvwxyz', '01234567890', '09876543210',
+                'qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+            for (const sequence of sequences) {
+                for (const direction of [sequence, Array.from(sequence).reverse().join('')]) {
+                    for (let length = direction.length; length >= 4; length--) {
+                        for (let start = 0; start <= direction.length - length; start++) {
+                            remaining = remaining.split(direction.slice(start, start + length)).join('');
+                        }
+                    }
+                }
+            }
+            remaining = remaining.replace(/[013457@$!]/g, character => ({
                 '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't',
                 '@': 'a', '$': 's', '!': 'i'
-            })[character]).replace(/[^a-z]/g, '');
-            const predictable = /^(password|letmein|welcome|admin|qwerty|iloveyou)+$/.test(common)
-                || /^(1234567890?|0123456789|qwertyuiop|asdfghjkl|abcdefghijklmnopqrstuvwxyz)+$/.test(normalized)
-                || /^(.{1,6})\1+$/u.test(normalized);
+            })[character]).replace(/password|letmein|welcome|admin|qwerty|iloveyou/g, '');
+            let previous;
+            do {
+                previous = remaining;
+                remaining = remaining.replace(/(.{1,32}?)\1+/gu, '');
+            } while (remaining !== previous);
+            const predictable = remaining.length <= patternText.length / 2;
+            const characters = Array.from(normalized.trim().replace(/\s+/g, ' '));
+            const unique = new Set(characters).size;
             if (characters.length < 10 || unique < 5 || predictable) return 'low';
             const variety = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^a-zA-Z0-9]/]
                 .filter(pattern => pattern.test(password)).length;
