@@ -499,16 +499,17 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
             decryptButton.value = 'Decrypting…';
 
             setTimeout(function () {
-                var data = JSON.parse(document.getElementById('data').textContent);
-                var salt = new Uint8Array(data.salt);
-                var iv = new Uint8Array(data.iv);
-                var encrypted = base64ToArray(data.encrypted);
+                Promise.resolve().then(function () {
+                    var data = JSON.parse(document.getElementById('data').textContent);
+                    var salt = new Uint8Array(data.salt);
+                    var iv = new Uint8Array(data.iv);
+                    var encrypted = base64ToArray(data.encrypted);
 
-                var password = document.querySelector('input[type=password]').value;
-                deriveKey(password, salt)
-                    .then(function (key) {
+                    var password = document.querySelector('input[type=password]').value;
+                    return deriveKey(password, salt).then(function (key) {
                         return decrypt(key, iv, encrypted);
-                    })
+                    });
+                })
                     .catch(function () {
                         throw 'Wrong password or corrupted file.';
                     })

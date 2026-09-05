@@ -9,25 +9,37 @@ const bytes = Uint8Array.of(0, 255, 47, 128, 10);
 const filename = 'private-zażółć.bin';
 const password = ' long unique test passphrase 🔐 ';
 
-function page(html, secret = password, repeated = secret) {
+function page(html, secret = password, repeated = secret, options = {}) {
+    function eventTarget(properties = {}) {
+        const listeners = {};
+        return Object.assign(properties, {
+            addEventListener(type, callback) { (listeners[type] ||= []).push(callback); },
+            dispatch(type) { for (const callback of listeners[type] || []) callback(); }
+        });
+    }
     const status = { textContent: '' };
-    const button = { disabled: false };
-    const form = { style: {}, addEventListener() {} };
+    const button = { disabled: false, value: html.includes('id="data"') ? 'Decrypt file' : 'Encrypt file' };
+    const form = eventTarget({ style: {} });
     const fields = {
-        password: { value: secret, addEventListener() {} },
-        'password-strength': { dataset: {} }, 'password-strength-label': { textContent: 'password strength', setAttribute(name, value) { this[name] = value; } }, password_repeated: { value: repeated, addEventListener() {} },
+        password: eventTarget({ value: secret }),
+        'password-strength': { dataset: {} }, 'password-strength-label': { textContent: 'password strength', setAttribute(name, value) { this[name] = value; } }, password_repeated: eventTarget({ value: repeated }),
+        'password-strength-status': { textContent: '' },
+        'password-match-status': { textContent: '' },
         'password-match': { dataset: {} },
-        'password-match-label': { setAttribute(name, value) { this[name] = value; } },
-        file: { files: [{ name: filename }] },
+        'password-match-label': { textContent: 'passwords match', setAttribute(name, value) { this[name] = value; } },
+        file: { files: [{ name: options.filename || filename }] },
         data: { textContent: html.match(/<script id="data"[^>]*>([\s\S]*?)<\/script>/)?.[1] }
     };
     const downloads = [];
     const derivations = [];
+    const timerErrors = [];
     let reads = 0;
     const context = vm.createContext({
         TextEncoder, TextDecoder, Uint8Array, Blob, DOMException, atob,
-        setTimeout: callback => setTimeout(callback, 0),
-        window: { addEventListener() {}, crypto: {
+        setTimeout: callback => setTimeout(() => {
+            try { callback(); } catch (error) { timerErrors.push(error); }
+        }, 0),
+        window: eventTarget({ crypto: {
             getRandomValues: array => webcrypto.getRandomValues(array),
             subtle: new Proxy(webcrypto.subtle, {
                 get(target, key) {
@@ -38,7 +50,7 @@ function page(html, secret = password, repeated = secret) {
                     return target[key].bind(target);
                 }
             })
-        } },
+        }, ...options.window }),
         document: {
             getElementById: id => fields[id],
             querySelector: selector => ({
@@ -49,7 +61,7 @@ function page(html, secret = password, repeated = secret) {
         FileReader: class {
             readAsArrayBuffer() {
                 reads++;
-                this.result = bytes.buffer;
+                this.result = (options.bytes || bytes).buffer;
                 this.onload();
             }
         }
@@ -59,11 +71,12 @@ function page(html, secret = password, repeated = secret) {
     }
     context.download = (...args) => downloads.push(args);
     return {
-        context, status, downloads, derivations, get reads() { return reads; },
+        context, status, button, fields, form, downloads, derivations, timerErrors, get reads() { return reads; },
         async run(name) {
             context[name]();
             const deadline = Date.now() + 10000;
-            while (button.disabled && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 5));
+            while (button.disabled && !timerErrors.length && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 5));
+            assert.deepEqual(timerErrors, [], 'no exceptions escape timer callbacks');
             assert.ok(!button.disabled, 'operation completes');
         }
     };
@@ -163,3 +176,26 @@ test('indicator updates and resets without changing password input', () => {
         assert.match(context.document.getElementById('password-strength-label')['aria-label'], new RegExp(level === 'empty' ? 'not entered' : level));
     }
 });
+
+function embeddedPayload(html, payload) {
+    return html.replace(/(<script id="data"[^>]*>)[\s\S]*?(<\/script>)/, (_, open, close) => open + payload + close);
+}
+
+for (const [label, payload] of [
+    ['invalid JSON', '{'],
+    ['invalid base64', JSON.stringify({ salt: [1], iv: [1], encrypted: '!' })],
+    ['null payload', 'null'],
+    ['missing fields', '{}']
+]) {
+    test(`malformed payload recovers: ${label}`, async () => {
+        const html = await artifact();
+        const decryptor = page(embeddedPayload(html, payload));
+        await decryptor.run('runDecrypt');
+        assert.match(decryptor.status.textContent, /Decryption failed:/);
+        assert.equal(decryptor.button.value, 'Decrypt file');
+        assert.equal(decryptor.downloads.length, 0);
+        decryptor.fields.data.textContent = html.match(/<script id="data"[^>]*>([\s\S]*?)<\/script>/)[1];
+        await decryptor.run('runDecrypt');
+        assertRecovered(decryptor);
+    });
+}
