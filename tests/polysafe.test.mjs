@@ -22,6 +22,8 @@ function page(html, secret = password, repeated = secret, options = {}) {
     const form = eventTarget({ style: {} });
     const fields = {
         password: eventTarget({ value: secret }),
+        password_hint: { value: options.hint || '' },
+        'password-hint': { textContent: '', hidden: true },
         'password-strength': { dataset: {} }, 'password-strength-label': { textContent: 'password strength', setAttribute(name, value) { this[name] = value; } }, password_repeated: eventTarget({ value: repeated }),
         'password-strength-status': { textContent: '' },
         'password-match-status': { textContent: '' },
@@ -82,8 +84,8 @@ function page(html, secret = password, repeated = secret, options = {}) {
     };
 }
 
-async function artifact() {
-    const encryptor = page(source);
+async function artifact(options = {}) {
+    const encryptor = page(source, password, password, options);
     await encryptor.run('runEncrypt');
     assert.equal(encryptor.status.textContent, '');
     assert.equal(encryptor.downloads.length, 1);
@@ -131,6 +133,44 @@ test('new artifacts use stronger PBKDF2 and preserve filename and binary bytes',
     assertRecovered(decryptor);
     assert.equal(decryptor.derivations[0].iterations, 600000);
     assert.equal(decryptor.derivations[0].hash.name, 'SHA-256');
+});
+
+test('optional hints appear before password entry and preserve Unicode and line breaks', async () => {
+    const hint = 'The title of the song we heard in Italy\nZażółć 🎵';
+    const html = await artifact({ hint: '  ' + hint + '  ' });
+    const decryptor = page(html, '');
+    assert.equal(decryptor.fields['password-hint'].textContent, 'Password hint: ' + hint);
+    assert.equal(decryptor.fields['password-hint'].hidden, false);
+    assert.equal(decryptor.derivations.length, 0);
+    assert.match(html, /aria-describedby="password-hint"/);
+    decryptor.fields.password.value = password;
+    await decryptor.run('runDecrypt');
+    assertRecovered(decryptor);
+});
+
+test('omitted and whitespace-only hints stay hidden and do not affect decryption', async () => {
+    for (const hint of ['', '  \n\t ']) {
+        const html = await artifact({ hint });
+        const payload = JSON.parse(html.match(/<script id="data"[^>]*>([\s\S]*?)<\/script>/)[1]);
+        assert.equal(Object.hasOwn(payload, 'hint'), false);
+        const decryptor = page(html);
+        assert.equal(decryptor.fields['password-hint'].hidden, true);
+        assert.equal(decryptor.fields['password-hint'].textContent, '');
+        await decryptor.run('runDecrypt');
+        assertRecovered(decryptor);
+    }
+});
+
+test('hint markup and replacement tokens stay literal without injecting executable HTML', async () => {
+    const hint = '</script><script>throw new Error("injected")</script><img src=x onerror=alert(1)> & " $& $` $\' {{___PAYLOAD___}}';
+    const html = await artifact({ hint });
+    assert.equal([...html.matchAll(/<script\b/gi)].length, 2);
+    assert.ok(!html.includes('<img'));
+    const decryptor = page(html);
+    assert.equal(decryptor.fields['password-hint'].textContent, 'Password hint: ' + hint);
+    assert.equal(decryptor.fields['password-hint'].hidden, false);
+    await decryptor.run('runDecrypt');
+    assertRecovered(decryptor);
 });
 
 test('wrong passwords and modified ciphertext are rejected', async () => {

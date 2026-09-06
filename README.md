@@ -6,6 +6,7 @@ Embed any file into an encrypted, self-decrypting HTML file.
 
 * Encryption and decryption happen locally in the browser
 * Encrypts arbitrary files (and their filename)
+* Optional password hint shown to the receiver before decryption
 * Decryptor supports almost all browsers released 2015 or later
 
 ## Usage
@@ -13,14 +14,14 @@ Embed any file into an encrypted, self-decrypting HTML file.
 ### Encryption
 
 1. Open a local or hosted copy of `polysafe.html` in your browser.
-2. Select a file, enter and repeat a long, unique passphrase and click `Encrypt`.
+2. Select a file, enter and repeat a long, unique passphrase, optionally click `Add password hint` to enter a clue, and click `Encrypt`.
 3. Store the encrypted, self-decrypting HTML file that will be downloaded.
 4. (Optional) Rename the HTML file if you want to keep the filename secret.
 
 ### Decryption
 
 1. Open the generated HTML file in your browser.
-2. Enter the password and click `Decrypt`.
+2. Read the password hint if one was provided, enter the password and click `Decrypt`.
 3. The original file with its original filename will be downloaded.
 
 ## Browser support
@@ -37,6 +38,8 @@ Embed any file into an encrypted, self-decrypting HTML file.
 * Any recent version of Firefox, Chrome, Opera or (Desktop) Safari
 
 ## Security considerations
+
+Password hints are stored unencrypted in the generated HTML and are visible to anyone with the file.
 
 PolySafe relies on the following algorithms offered natively by the WebCrypto API and running directly in the browser:
 
@@ -55,7 +58,7 @@ Should the self-decrypting HTML file have passed outside of your control between
 
 ## Validation
 
-Run `node --test tests/polysafe.test.mjs` (Node.js 22 or newer). The tests execute the generator and generated decryptor with real WebCrypto and browser API stubs, checking password validation and strength, live status updates, WebCrypto context checks, malformed-payload recovery, binary roundtrips (including a 1 MiB file), wrong passwords, ciphertext tampering, and legacy compatibility.
+Run `node --test tests/polysafe.test.mjs` (Node.js 22 or newer). The tests execute the generator and generated decryptor with real WebCrypto and browser API stubs, checking password validation and strength, optional hints (including Unicode and HTML injection attempts), live status updates, WebCrypto context checks, malformed-payload recovery, binary roundtrips (including a 1 MiB file), wrong passwords, ciphertext tampering, and legacy compatibility.
 
 Run `make build` before publishing. It synchronizes the application and CNAME into `dist/`, including `index.html` for the site root.
 
