@@ -23,6 +23,11 @@ function page(html, secret = password, repeated = secret, options = {}) {
     const fields = {
         password: eventTarget({ value: secret }),
         password_hint: { value: options.hint || '' },
+        'source-file': eventTarget({ checked: options.source !== 'message' }),
+        'source-message': eventTarget({ checked: options.source === 'message' }),
+        'file-source': { hidden: false },
+        'message-source': { hidden: true },
+        message: { value: options.message || '' },
         'password-hint': { textContent: '', hidden: true },
         'password-strength': { dataset: {} }, 'password-strength-label': { textContent: 'password strength', setAttribute(name, value) { this[name] = value; } }, password_repeated: eventTarget({ value: repeated }),
         'password-strength-status': { textContent: '' },
@@ -133,6 +138,35 @@ test('new artifacts use stronger PBKDF2 and preserve filename and binary bytes',
     assertRecovered(decryptor);
     assert.equal(decryptor.derivations[0].iterations, 600000);
     assert.equal(decryptor.derivations[0].hash.name, 'SHA-256');
+});
+
+test('text messages encrypt without file reading and decrypt as message.txt', async () => {
+    const message = 'Meet at 19:30 by the café.\nBring the 🔐 key.';
+    const encryptor = page(source, password, password, { source: 'message', message });
+    assert.equal(encryptor.fields['file-source'].hidden, true);
+    assert.equal(encryptor.fields['message-source'].hidden, false);
+
+    await encryptor.run('runEncrypt');
+
+    assert.equal(encryptor.reads, 0);
+    assert.equal(encryptor.downloads.length, 1);
+    assert.equal(encryptor.downloads[0][0], 'message.txt.html');
+    const html = new TextDecoder().decode(encryptor.downloads[0][1]);
+    assert.ok(!html.includes(message));
+
+    const decryptor = page(html);
+    await decryptor.run('runDecrypt');
+    assert.equal(decryptor.downloads[0][0].name, 'message.txt');
+    assert.equal(new TextDecoder().decode(decryptor.downloads[0][0].content), message);
+});
+
+test('empty text messages are rejected before key derivation', async () => {
+    const encryptor = page(source, password, password, { source: 'message' });
+    await encryptor.run('runEncrypt');
+    assert.match(encryptor.status.textContent, /write a text message/i);
+    assert.equal(encryptor.reads, 0);
+    assert.equal(encryptor.derivations.length, 0);
+    assert.equal(encryptor.downloads.length, 0);
 });
 
 test('optional hints appear before password entry and preserve Unicode and line breaks', async () => {

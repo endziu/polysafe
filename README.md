@@ -1,11 +1,12 @@
 # PolySafe
 
-Embed any file into an encrypted, self-decrypting HTML file.
+Embed any file or text message into an encrypted, self-decrypting HTML file.
 
 ## Features
 
 * Encryption and decryption happen locally in the browser
 * Encrypts arbitrary files (and their filename)
+* Encrypts a text message as a UTF-8 `message.txt` file
 * Optional password hint shown to the receiver before decryption
 * Decryptor supports almost all browsers released 2015 or later
 
@@ -14,7 +15,7 @@ Embed any file into an encrypted, self-decrypting HTML file.
 ### Encryption
 
 1. Open a local or hosted copy of `polysafe.html` in your browser.
-2. Select a file, enter and repeat a long, unique passphrase, optionally click `Add password hint` to enter a clue, and click `Encrypt`.
+2. Choose `File` and select a file, or choose `Text message` and write a message. Enter and repeat a long, unique passphrase, optionally click `Add password hint` to enter a clue, and click `Encrypt`.
 3. Store the encrypted, self-decrypting HTML file that will be downloaded.
 4. (Optional) Rename the HTML file if you want to keep the filename secret.
 
@@ -22,7 +23,7 @@ Embed any file into an encrypted, self-decrypting HTML file.
 
 1. Open the generated HTML file in your browser.
 2. Read the password hint if one was provided, enter the password and click `Decrypt`.
-3. The original file with its original filename will be downloaded.
+3. The original file with its original filename will be downloaded. Text messages are downloaded as `message.txt`.
 
 ## Browser support
 

@@ -46,6 +46,14 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
         .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 15px; }
         input { display: block; width: 100%; min-height: 48px; border-radius: 8px; }
         textarea { display: block; width: 100%; border-radius: 8px; resize: vertical; }
+        .source-options { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 0; padding: 4px; border: 1px solid #343a46; border-radius: 8px; background: #11141a; }
+        .source-options label { padding: 8px; border-radius: 5px; text-align: center; cursor: pointer; }
+        .source-options label:has(input:checked) { background: #252a34; color: #f1f3f5; }
+        .source-options label:focus-within { outline: 2px solid #8b7cf6; outline-offset: 2px; }
+        .source-options input { position: absolute; width: 1px; min-height: 1px; opacity: 0; }
+        .source-input[hidden] { display: none; }
+        #message { min-height: 132px; }
+        .message-note { margin: 6px 2px 0; font-size: 13px; line-height: 1.5; }
         .hint-option summary, .password-hint { font-size: 13px; line-height: 1.5; }
         .hint-option summary { cursor: pointer; }
         .hint-option textarea { margin-top: 12px; }
@@ -80,10 +88,21 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 <body>
     <main>
         <h1>PolySafe</h1>
-        <p class="intro muted">Encrypt a file into a self-decrypting HTML file.</p>
-        <noscript>JavaScript is required to encrypt files.</noscript>
+        <p class="intro muted">Encrypt a file or text message into a self-decrypting HTML file.</p>
+        <noscript>JavaScript is required to encrypt files and messages.</noscript>
         <form action="javascript:;" style="display:none">
-            <input type="file" id="file" aria-label="File to encrypt" autofocus>
+            <fieldset class="source-options" aria-label="Content to encrypt">
+                <label class="muted"><input type="radio" id="source-file" name="source" value="file" checked>File</label>
+                <label class="muted"><input type="radio" id="source-message" name="source" value="message">Text message</label>
+            </fieldset>
+            <div class="source-input" id="file-source">
+                <input type="file" id="file" aria-label="File to encrypt" autofocus>
+            </div>
+            <div class="source-input" id="message-source" hidden>
+                <label class="visually-hidden" for="message">Text message to encrypt</label>
+                <textarea class="field" id="message" rows="5" placeholder="Write a private message"></textarea>
+                <p class="muted message-note">The decrypted message will be saved as message.txt.</p>
+            </div>
             <div class="password-field">
                 <input type="password" class="field" id="password" aria-label="Password" placeholder="Password" autocomplete="new-password" aria-describedby="password-strength-status" required>
                 <button type="button" class="muted password-toggle" aria-label="Show password" aria-controls="password" aria-pressed="false" onclick="togglePasswordVisibility(this)">
@@ -214,8 +233,20 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
             setTimeout(() => {
                 updatePasswordStrength();
                 updatePasswordMatch();
+                updateEncryptionSource();
             }, 0);
         });
+
+        function updateEncryptionSource() {
+            const messageSelected = document.getElementById('source-message').checked;
+            document.getElementById('file-source').hidden = messageSelected;
+            document.getElementById('message-source').hidden = !messageSelected;
+        }
+
+        for (const id of ['source-file', 'source-message']) {
+            document.getElementById(id).addEventListener('change', updateEncryptionSource);
+        }
+        updateEncryptionSource();
 
         function getRandomBytes(num) {
             let bytes = new Uint8Array(num);
@@ -386,8 +417,14 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
                 return;
             }
 
+            const messageSelected = document.getElementById('source-message').checked;
             const file = document.getElementById('file').files[0];
-            if (!file) {
+            const message = document.getElementById('message').value;
+            if (messageSelected && message.length === 0) {
+                status.textContent = 'Write a text message first.';
+                return;
+            }
+            if (!messageSelected && !file) {
                 status.textContent = 'Select a file first.';
                 return;
             }
@@ -409,12 +446,17 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
             const salt = getRandomBytes(16);
             const iv = getRandomBytes(16);
 
-            readFile(file)
-                .then(file_bytes => preprendFilename(file.name, file_bytes))
+            const filename = messageSelected ? 'message.txt' : file.name;
+            const content = messageSelected
+                ? Promise.resolve(new TextEncoder('utf-8').encode(message))
+                : readFile(file);
+
+            content
+                .then(content_bytes => preprendFilename(filename, content_bytes))
                 .then(payload_bytes => deriveKey(password, salt)
                     .then(key => encrypt(key, iv, payload_bytes)))
                 .then(buffer => serialize(salt, iv, buffer, hint))
-                .then(buffer => download(file.name + '.html', buffer))
+                .then(buffer => download(filename + '.html', buffer))
                 .catch(e => {
                     status.textContent = 'Encryption failed: ' + e.message;
                 })
